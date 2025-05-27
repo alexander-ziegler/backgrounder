@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require 'thread'
-require 'set'
+require "set"
 
 module Backgrounder
   # Executes background jobs, manages worker threads, concurrency, and recovery.
@@ -58,7 +57,8 @@ module Backgrounder
     # @param job [Backgrounder::Job]
     # @return [void]
     def enqueue(job)
-      wal.append(WAL::Entry.new(job_id: job.id, event: :enqueued, data: job.to_h, state: job.state, timestamp: Time.now.utc))
+      wal.append(WAL::Entry.new(job_id: job.id, event: :enqueued, data: job.to_h, state: job.state,
+                                timestamp: Time.now.utc))
       job_queue << job
     end
 
@@ -69,8 +69,9 @@ module Backgrounder
         begin
           job = job_queue.pop
           break if job == :shutdown
+
           execute_job(job)
-        rescue => e
+        rescue Backgrounder::Error => e
           logger.error("Worker thread error: #{e}\n#{e.backtrace.join("\n")}")
         end
       end
@@ -80,20 +81,20 @@ module Backgrounder
     # @param job [Backgrounder::Job]
     # @return [void]
     def execute_job(job)
-      job_def = DSL.get_job(job.args['job_name']&.to_sym)
+      job_def = DSL.get_job(job.args["job_name"]&.to_sym)
       exclusive = job_def && job_def[:opts][:exclusive]
       lock_key = nil
       if exclusive
         lock_key =
           case exclusive
           when TrueClass
-            job.args['job_name']
+            job.args["job_name"]
           when Symbol, String
             job.args[exclusive.to_s] || job.args[exclusive.to_sym]
           when Proc
             exclusive.call(job.args)
           else
-            job.args['job_name']
+            job.args["job_name"]
           end
       end
       if lock_key
@@ -108,31 +109,34 @@ module Backgrounder
     # @param job_def [Hash, nil]
     # @return [void]
     def execute_job_inner(job, job_def)
-      begin
-        job.mark_running
-        wal.append(WAL::Entry.new(job_id: job.id, event: :started, data: job.to_h, state: job.state, timestamp: Time.now.utc))
-        if job_def.nil?
-          logger.error("No job definition for #{job.args['job_name']}")
-          job.mark_failed
-          wal.append(WAL::Entry.new(job_id: job.id, event: :failed, data: job.to_h, state: job.state, timestamp: Time.now.utc))
-          return
-        end
-        # Execute the job block with args
-        job_def[:block].call(*job.args['args'])
-        job.mark_complete
-        wal.append(WAL::Entry.new(job_id: job.id, event: :completed, data: job.to_h, state: job.state, timestamp: Time.now.utc))
-      rescue => e
-        logger.error("Job #{job.id} failed: #{e}")
-        job.retries += 1
-        if job.retries <= job.max_retries
-          wal.append(WAL::Entry.new(job_id: job.id, event: :retry, data: job.to_h, state: job.state, timestamp: Time.now.utc))
-          # Exponential backoff (simple sleep for now)
-          sleep(2 ** job.retries)
-          job_queue << job
-        else
-          job.mark_failed
-          wal.append(WAL::Entry.new(job_id: job.id, event: :failed, data: job.to_h, state: job.state, timestamp: Time.now.utc))
-        end
+      job.mark_running
+      wal.append(WAL::Entry.new(job_id: job.id, event: :started, data: job.to_h, state: job.state,
+                                timestamp: Time.now.utc))
+      if job_def.nil?
+        logger.error("No job definition for #{job.args["job_name"]}")
+        job.mark_failed
+        wal.append(WAL::Entry.new(job_id: job.id, event: :failed, data: job.to_h, state: job.state,
+                                  timestamp: Time.now.utc))
+        return
+      end
+      # Execute the job block with args
+      job_def[:block].call(*job.args["args"])
+      job.mark_complete
+      wal.append(WAL::Entry.new(job_id: job.id, event: :completed, data: job.to_h, state: job.state,
+                                timestamp: Time.now.utc))
+    rescue Backgrounder::Error => e
+      logger.error("Job #{job.id} failed: #{e}")
+      job.retries += 1
+      if job.retries <= job.max_retries
+        wal.append(WAL::Entry.new(job_id: job.id, event: :retry, data: job.to_h, state: job.state,
+                                  timestamp: Time.now.utc))
+        # Exponential backoff (simple sleep for now)
+        sleep(2**job.retries)
+        job_queue << job
+      else
+        job.mark_failed
+        wal.append(WAL::Entry.new(job_id: job.id, event: :failed, data: job.to_h, state: job.state,
+                                  timestamp: Time.now.utc))
       end
     end
 
@@ -145,16 +149,18 @@ module Backgrounder
         # Only keep the latest state for each job
         in_flight[entry.job_id] = entry
         # Track fingerprints of completed/failed jobs
-        if %w[complete failed].include?(entry.state.to_s) && entry.data['fingerprint']
-          completed_fingerprints << entry.data['fingerprint']
+        if %w[complete failed].include?(entry.state.to_s) && entry.data["fingerprint"]
+          completed_fingerprints << entry.data["fingerprint"]
         end
       end
       in_flight.each_value do |entry|
         # Only re-enqueue jobs not complete/failed and not already completed by fingerprint
         next if %w[complete failed].include?(entry.state.to_s)
-        fingerprint = entry.data['fingerprint']
+
+        fingerprint = entry.data["fingerprint"]
         next if fingerprint && completed_fingerprints.include?(fingerprint)
-        job_hash = entry.data.merge('job_name' => entry.data['job_name'])
+
+        job_hash = entry.data.merge("job_name" => entry.data["job_name"])
         job = Job.from_h(job_hash)
         job_queue << job
       end

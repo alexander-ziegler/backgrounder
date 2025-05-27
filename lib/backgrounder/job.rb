@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require 'securerandom'
-require 'json'
-require 'digest'
+require "securerandom"
+require "json"
+require "digest"
 
 module Backgrounder
   # Represents a background job and its metadata.
@@ -41,7 +41,8 @@ module Backgrounder
     # @param created_at [Time, nil] Creation time
     # @param updated_at [Time, nil] Last update time
     # @param fingerprint [String, nil] Job fingerprint
-    def initialize(args: {}, max_retries: 3, exclusive: false, id: nil, state: :queued, retries: 0, created_at: nil, updated_at: nil, fingerprint: nil)
+    def initialize(args: {}, max_retries: 3, exclusive: false, id: nil, state: :queued, retries: 0, created_at: nil,
+                   updated_at: nil, fingerprint: nil)
       @id = id || SecureRandom.uuid
       @args = args
       @state = state.to_sym
@@ -57,15 +58,15 @@ module Backgrounder
     # @return [Hash]
     def to_h
       {
-        'id' => id,
-        'args' => args,
-        'state' => state.to_s,
-        'retries' => retries,
-        'max_retries' => max_retries,
-        'exclusive' => exclusive,
-        'created_at' => created_at.iso8601,
-        'updated_at' => updated_at.iso8601,
-        'fingerprint' => fingerprint
+        "id" => id,
+        "args" => args,
+        "state" => state.to_s,
+        "retries" => retries,
+        "max_retries" => max_retries,
+        "exclusive" => exclusive,
+        "created_at" => created_at.iso8601,
+        "updated_at" => updated_at.iso8601,
+        "fingerprint" => fingerprint
       }
     end
 
@@ -74,15 +75,15 @@ module Backgrounder
     # @return [Job]
     def self.from_h(hash)
       new(
-        id: hash['id'],
-        args: hash['args'],
-        state: hash['state'],
-        retries: hash['retries'] || 0,
-        max_retries: hash['max_retries'] || 3,
-        exclusive: hash['exclusive'] || false,
-        created_at: Time.parse(hash['created_at']),
-        updated_at: Time.parse(hash['updated_at']),
-        fingerprint: hash['fingerprint']
+        id: hash["id"],
+        args: hash["args"],
+        state: hash["state"],
+        retries: hash["retries"] || 0,
+        max_retries: hash["max_retries"] || 3,
+        exclusive: hash["exclusive"] || false,
+        created_at: Time.parse(hash["created_at"]),
+        updated_at: Time.parse(hash["updated_at"]),
+        fingerprint: hash["fingerprint"]
       )
     end
 
@@ -135,8 +136,8 @@ module Backgrounder
     # Generate fingerprint for deduplication (SHA256 of job name + args).
     # @return [String]
     def generate_fingerprint
-      job_name = args['job_name'] || args[:job_name] || ''
-      job_args = args['args'] || args[:args] || args
+      job_name = args["job_name"] || args[:job_name] || ""
+      job_args = args["args"] || args[:args] || args
       Digest::SHA256.hexdigest([job_name, job_args].to_json)
     end
   end

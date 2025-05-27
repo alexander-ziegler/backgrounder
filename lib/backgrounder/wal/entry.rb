@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'json'
-require 'time'
+require "json"
+require "time"
 
 module Backgrounder
   module WAL
@@ -37,11 +37,11 @@ module Backgrounder
       # @return [Hash]
       def to_h
         {
-          'job_id' => job_id,
-          'event' => event,
-          'data' => data,
-          'timestamp' => timestamp.iso8601,
-          'state' => state
+          "job_id" => job_id,
+          "event" => event,
+          "data" => data,
+          "timestamp" => timestamp.iso8601,
+          "state" => state
         }
       end
 
@@ -49,13 +49,14 @@ module Backgrounder
       # @param hash [Hash]
       # @return [Entry, nil]
       def self.from_h(hash)
-        return nil unless hash && hash['job_id'] && hash['event'] && hash['timestamp']
+        return nil unless hash && hash["job_id"] && hash["event"] && hash["timestamp"]
+
         new(
-          job_id: hash['job_id'],
-          event: hash['event'],
-          data: hash['data'],
-          timestamp: Time.parse(hash['timestamp']),
-          state: hash['state']
+          job_id: hash["job_id"],
+          event: hash["event"],
+          data: hash["data"],
+          timestamp: Time.parse(hash["timestamp"]),
+          state: hash["state"]
         )
       end
 

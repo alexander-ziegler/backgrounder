@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
+# Internal job registry and configuration for Backgrounder DSL.
 module Backgrounder
+  # DSL provides methods for configuring and defining jobs.
   module DSL
-    # Internal job registry and configuration for Backgrounder DSL.
-    # Provides methods for configuring and defining jobs.
     # @!attribute [rw] job_registry
     #   @return [Hash] The registry of defined jobs
     # @!attribute [rw] config
@@ -27,7 +27,8 @@ module Backgrounder
       # @yield The job block to execute
       # @return [void]
       def define_job(name, opts = {}, &block)
-        raise ArgumentError, 'Block required for job definition' unless block_given?
+        raise ArgumentError, "Block required for job definition" unless block_given?
+
         job_def = {
           name: name.to_sym,
           opts: opts,
