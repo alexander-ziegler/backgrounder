@@ -45,9 +45,13 @@ module Backgrounder
     # Worker thread loop: execute jobs from the queue
     def worker_loop
       while @running
-        job = job_queue.pop
-        break if job == :shutdown
-        execute_job(job)
+        begin
+          job = job_queue.pop
+          break if job == :shutdown
+          execute_job(job)
+        rescue => e
+          logger.error("Worker thread error: #{e}\n#{e.backtrace.join("\n")}")
+        end
       end
     end
 

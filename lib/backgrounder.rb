@@ -14,14 +14,4 @@ require_relative "backgrounder/wal/entry"
 module Backgrounder
   # Error class for gem-specific errors
   class Error < StandardError; end
-
-  # Expose DSL and Runner for user convenience
-  DSL = Backgrounder::DSL
-  Runner = Backgrounder::Runner
-  Job = Backgrounder::Job
-  WAL = Backgrounder::WAL
-
-  # Main configuration and entry point for the gem
-  # Handles global settings, job registration, and runner lifecycle
-  # TODO: Add configuration DSL and registry
 end
