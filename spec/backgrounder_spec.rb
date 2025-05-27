@@ -279,7 +279,8 @@ RSpec.describe 'Backgrounder::Runner integration' do
 
   before do
     Backgrounder::DSL.job_registry.clear
-    wal # ensure file is created
+    # ensure file is created
+    wal
   end
 
   after do
@@ -295,11 +296,12 @@ RSpec.describe 'Backgrounder::Runner integration' do
     job = Backgrounder::Job.new(args: { 'job_name' => 'test_job', 'args' => [42] })
     runner.start
     runner.enqueue(job)
-    sleep 0.2 # allow job to run
+    sleep 0.2
     runner.stop
     expect(result).to eq([42])
     # Check WAL for completed event
     events = wal.replay.to_a.select { |e| e.job_id == job.id }
+
     expect(events.map(&:event)).to include('completed')
   end
 
@@ -310,8 +312,8 @@ RSpec.describe 'Backgrounder::Runner integration' do
     job = Backgrounder::Job.new(args: { 'job_name' => 'fail_job', 'args' => [] }, max_retries: 2)
     runner.start
     runner.enqueue(job)
-    sleep 2 # allow retries and backoff
-    runner.stop# initial + 2 retries
+    sleep 2 
+    runner.stop
     events = wal.replay.to_a.select { |e| e.job_id == job.id }
     expect(events.map(&:event)).to include('retry')
   end
@@ -322,9 +324,7 @@ RSpec.describe 'Backgrounder::Runner integration' do
       result << x
     end
     job = Backgrounder::Job.new(args: { 'job_name' => 'recover_job', 'args' => [99] })
-    # Simulate enqueue and crash before completion
     wal.append(Backgrounder::WAL::Entry.new(job_id: job.id, event: :enqueued, data: job.to_h, state: job.state, timestamp: Time.now.utc))
-    # New runner instance should recover and execute the job
     new_runner = Backgrounder::Runner.new(max_threads: 1, logger: logger, wal: wal)
     new_runner.start
     sleep 0.2
@@ -355,15 +355,14 @@ RSpec.describe 'Backgrounder deduplication/fingerprinting' do
     job_args = { 'job_name' => 'dedupe_job', 'args' => [123] }
     job1 = Backgrounder::Job.new(args: job_args)
     fingerprint = job1.fingerprint
-    # Simulate job completed in WAL
     wal.append(Backgrounder::WAL::Entry.new(job_id: job1.id, event: :completed, data: job1.to_h, state: 'complete', timestamp: Time.now.utc))
-    # Simulate a duplicate job (same args/fingerprint) enqueued later
     job2 = Backgrounder::Job.new(args: job_args)
     wal.append(Backgrounder::WAL::Entry.new(job_id: job2.id, event: :enqueued, data: job2.to_h, state: 'queued', timestamp: Time.now.utc))
     runner = Backgrounder::Runner.new(max_threads: 1, logger: logger, wal: wal)
     runner.start
     sleep 0.2
     runner.stop
+
     # Only the first job should have been executed (and it was already complete)
     expect(executed).to eq([])
   end
@@ -381,6 +380,8 @@ RSpec.describe 'Backgrounder exclusive jobs with resource locking' do
   end
 
   it 'does not run jobs with the same resource key concurrently' do
+    # Jobs 1 and 2 have the same user_id, so should not overlap
+    # Job 3 has a different user_id, so can run concurrently
     Backgrounder::DSL.job_registry.clear
     execution_order = []
     Backgrounder::DSL.define_job :exclusive_job, exclusive: :user_id do |user_id, sleep_time|
@@ -398,15 +399,14 @@ RSpec.describe 'Backgrounder exclusive jobs with resource locking' do
     runner.enqueue(job3)
     sleep 1
     runner.stop
-    # Jobs 1 and 2 have the same user_id, so should not overlap
-    # Job 3 has a different user_id, so can run concurrently
     user1_events = execution_order.select { |u, _| u == 1 }
     user2_events = execution_order.select { |u, _| u == 2 }
     # For user 1, :end of first must come before :start of second
+    # For user 2, both :start and :end should be present
     first_end = user1_events.index([1, :end])
     second_start = user1_events.rindex([1, :start])
+
     expect(first_end).to be < second_start
-    # For user 2, both :start and :end should be present
     expect(user2_events).to include([2, :start], [2, :end])
   end
 end

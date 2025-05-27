@@ -1,13 +1,12 @@
 # Backgrounder
 
-A robust, testable, and embeddable background job system for Ruby, inspired by Designing Data-Intensive Applications (DDIA).
+A lightweight, simple background job system for Ruby.
 
 ## Overview
 
 **Backgrounder** provides a DSL for defining background jobs, executed via threads (or fibers, in the future) without relying on external queue processors like Sidekiq or Redis. It is ideal for:
 
 - Small apps that don't want Redis or external dependencies
-- Testable, embeddable job systems
 - Developers who want more visibility and control over job processing
 - Educational and research projects exploring job durability, recovery, and concurrency
 
@@ -19,15 +18,6 @@ A robust, testable, and embeddable background job system for Ruby, inspired by D
 - **Flexible Data Model:** JSON-based logs, pluggable serializers (YAML, etc.)
 - **Observability:** Job lifecycle events, logger integration, and stubs for metrics/event hooks
 - **No External Dependencies:** No Redis or database required
-
-## DDIA Concepts Implemented
-
-- Fault-tolerant systems (WAL, recovery)
-- Idempotence (job fingerprinting, deduplication)
-- Delivery guarantees (at-least-once)
-- Isolation/concurrency control (threads, resource locking)
-- Flexible schema (JSON/YAML logs)
-- Observability (event logging, logger)
 
 ## Installation
 

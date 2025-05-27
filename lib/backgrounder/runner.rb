@@ -4,11 +4,27 @@ require 'thread'
 require 'set'
 
 module Backgrounder
-  # Responsible for executing jobs, managing threads, and recovery
-  # DDIA: Fault tolerance, at-least-once delivery, recovery, concurrency, observability
+  # Executes background jobs, manages worker threads, concurrency, and recovery.
+  # Handles job queueing, WAL integration, retries, and exclusive resource locking.
+  # @!attribute [rw] max_threads
+  #   @return [Integer] Maximum number of worker threads
+  # @!attribute [rw] logger
+  #   @return [Logger] Logger instance
+  # @!attribute [rw] wal
+  #   @return [Backgrounder::WAL::FileStorage] WAL storage
+  # @!attribute [rw] job_queue
+  #   @return [Queue] Thread-safe job queue
+  # @!attribute [rw] threads
+  #   @return [Array<Thread>] Worker threads
+  # @!attribute [rw] running
+  #   @return [Boolean] Whether the runner is running
   class Runner
     attr_reader :max_threads, :logger, :wal, :job_queue, :threads, :running
 
+    # Initialize a new Runner.
+    # @param max_threads [Integer] Number of worker threads
+    # @param logger [Logger, nil] Logger instance
+    # @param wal [Backgrounder::WAL::FileStorage, nil] WAL storage
     def initialize(max_threads: 5, logger: nil, wal: nil)
       @max_threads = max_threads
       @logger = logger || Logger.new($stdout)
@@ -19,7 +35,8 @@ module Backgrounder
       @mutexes = Hash.new { |h, k| h[k] = Mutex.new }
     end
 
-    # Start the runner: recover jobs, start worker threads
+    # Start the runner: recover jobs, start worker threads.
+    # @return [void]
     def start
       @running = true
       recover_from_wal
@@ -29,20 +46,24 @@ module Backgrounder
       end
     end
 
-    # Stop the runner and wait for threads to finish
+    # Stop the runner and wait for threads to finish.
+    # @return [void]
     def stop
       @running = false
       max_threads.times { job_queue << :shutdown }
       threads.each(&:join)
     end
 
-    # Enqueue a job for execution and log to WAL
+    # Enqueue a job for execution and log to WAL.
+    # @param job [Backgrounder::Job]
+    # @return [void]
     def enqueue(job)
       wal.append(WAL::Entry.new(job_id: job.id, event: :enqueued, data: job.to_h, state: job.state, timestamp: Time.now.utc))
       job_queue << job
     end
 
-    # Worker thread loop: execute jobs from the queue
+    # Worker thread loop: execute jobs from the queue.
+    # @return [void]
     def worker_loop
       while @running
         begin
@@ -55,7 +76,9 @@ module Backgrounder
       end
     end
 
-    # Execute a single job, handle retries and state transitions
+    # Execute a single job, handle retries and state transitions.
+    # @param job [Backgrounder::Job]
+    # @return [void]
     def execute_job(job)
       job_def = DSL.get_job(job.args['job_name']&.to_sym)
       exclusive = job_def && job_def[:opts][:exclusive]
@@ -80,6 +103,10 @@ module Backgrounder
       end
     end
 
+    # Internal: actually execute the job block, handle state and retries.
+    # @param job [Backgrounder::Job]
+    # @param job_def [Hash, nil]
+    # @return [void]
     def execute_job_inner(job, job_def)
       begin
         job.mark_running
@@ -109,7 +136,8 @@ module Backgrounder
       end
     end
 
-    # Recover jobs from WAL (replay and enqueue in-flight jobs)
+    # Recover jobs from WAL (replay and enqueue in-flight jobs).
+    # @return [void]
     def recover_from_wal
       in_flight = {}
       completed_fingerprints = Set.new
